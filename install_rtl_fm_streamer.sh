@@ -8,7 +8,7 @@ sudo apt-get update && sudo apt-get upgrade -y
 
 # Install required dependencies including dialog for interactive input
 echo "Installing dependencies..."
-sudo apt-get install -y git cmake build-essential libusb-1.0-0-dev libev-dev net-tools dialog
+sudo apt-get install -y git cmake build-essential libusb-1.0-0-dev libev-dev net-tools
 
 # Clone the fm2ip-streamer repository
 echo "Cloning fm2ip-streamer repository..."
