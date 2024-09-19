@@ -1,67 +1,12 @@
-#!/bin/bash
+### **Using wget:**
+```bash
+wget -O install_rtl_fm_streamer.sh https://raw.githubusercontent.com/mrgs83/fm2ip-streamer/master/install_rtl_fm_streamer.sh
+chmod +x install_rtl_fm_streamer.sh
+./install_rtl_fm_streamer.sh
 
-# RTL SDR FM Streamer Autodeploy Script for Ubuntu 24.04 (No Docker)
 
-# Update system
-echo "Updating system..."
-sudo apt-get update && sudo apt-get upgrade -y
-
-# Install required dependencies
-echo "Installing dependencies..."
-sudo apt-get install -y git cmake build-essential libusb-1.0-0-dev libev-dev net-tools
-
-# Clone the updated fm2ip-streamer repository
-echo "Cloning fm2ip-streamer repository..."
-git clone https://github.com/mrgs83/fm2ip-streamer.git
-
-# Build fm2ip-streamer
-echo "Building fm2ip-streamer..."
-cd fm2ip-streamer
-mkdir build
-cd build
-cmake ../
-make
-
-# Add /usr/local/lib to the library path if it's not there already
-if ! grep -q "/usr/local/lib" /etc/ld.so.conf.d/rtlsdr.conf; then
-  echo "/usr/local/lib" | sudo tee /etc/ld.so.conf.d/rtlsdr.conf
-  sudo ldconfig
-fi
-
-# Blacklist the conflicting DVB module to avoid conflicts with the RTL2832U device
-echo "Blacklisting dvb_usb_rtl28xxu kernel module..."
-echo "blacklist dvb_usb_rtl28xxu" | sudo tee /etc/modprobe.d/blacklist-rtl-sdr.conf
-sudo rmmod dvb_usb_rtl28xxu
-
-# Create systemd service for fm2ip-streamer
-echo "Creating systemd service for fm2ip-streamer..."
-sudo tee /etc/systemd/system/rtl_fm_streamer.service > /dev/null <<EOL
-[Unit]
-Description=RTL SDR FM Streamer
-After=network.target
-
-[Service]
-ExecStart=$(pwd)/rtl_fm_streamer -P 1001
-WorkingDirectory=$(pwd)
-Restart=always
-User=$(whoami)
-
-[Install]
-WantedBy=multi-user.target
-EOL
-
-# Enable and start the service
-echo "Enabling and starting fm2ip-streamer service..."
-sudo systemctl daemon-reload
-sudo systemctl enable rtl_fm_streamer.service
-sudo systemctl start rtl_fm_streamer.service
-
-# Display usage instructions
-echo "RTL SDR FM Streamer is now running."
-echo "Usage:"
-echo "  Mono: http://<your_ip>:1001/<FrequencyInHz>"
-echo "  Stereo: http://<your_ip>:1001/<FrequencyInHz>/1"
-echo "To change the port, edit the systemd service file (/etc/systemd/system/rtl_fm_streamer.service)."
-
-# Installation complete
-echo "Installation complete!"
+### **Using curl:**
+````bash
+curl -o install_rtl_fm_streamer.sh https://raw.githubusercontent.com/mrgs83/fm2ip-streamer/master/install_rtl_fm_streamer.sh
+chmod +x install_rtl_fm_streamer.sh
+./install_rtl_fm_streamer.sh
