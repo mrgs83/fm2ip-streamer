@@ -1,44 +1,22 @@
 #!/bin/bash
 
-# RTL SDR FM Streamer Docker Autodeploy Script for Ubuntu 24.04
+# RTL SDR FM Streamer Autodeploy Script for Ubuntu 24.04 (No Docker)
 
 # Update system
 echo "Updating system..."
 sudo apt-get update && sudo apt-get upgrade -y
 
-# Install required Docker dependencies
-echo "Installing Docker dependencies..."
-sudo apt-get install -y apt-transport-https ca-certificates curl software-properties-common
+# Install required dependencies including dialog for interactive input
+echo "Installing dependencies..."
+sudo apt-get install -y git cmake build-essential libusb-1.0-0-dev libev-dev net-tools dialog
 
-# Add Docker GPG key
-echo "Adding Docker GPG key..."
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
-
-# Add Docker repository
-echo "Adding Docker repository..."
-sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
-
-# Install Docker
-echo "Installing Docker..."
-sudo apt-get update
-sudo apt-get install -y docker-ce docker-compose
-
-# Enable Docker to start on boot
-echo "Enabling Docker to start on boot..."
-sudo systemctl enable docker
-sudo systemctl start docker
-
-# Configure network in bridge mode
-echo "Configuring Docker network to bridge mode..."
-docker network create -d bridge rtl_sdr_network
-
-# Use dialog to ask the user how many containers to deploy
-container_count=$(dialog --inputbox "How many containers are you planning to deploy?" 10 30 3>&1 1>&2 2>&3 3>&-)
+# Use dialog to ask the user how many tuners to deploy
+tuner_count=$(dialog --inputbox "How many tuners are you planning to use?" 10 30 3>&1 1>&2 2>&3 3>&-)
 clear
 
-# Validate container count input
-if ! [[ "$container_count" =~ ^[0-9]+$ ]]; then
-  echo "Invalid input. Please enter a valid number."
+# Validate tuner count input
+if ! [[ "$tuner_count" =~ ^[0-9]+$ ]]; then
+  echo "Invalid input. Please enter a number."
   exit 1
 fi
 
@@ -49,30 +27,41 @@ git clone https://github.com/mrgs83/fm2ip-streamer.git
 # Build fm2ip-streamer
 echo "Building fm2ip-streamer..."
 cd fm2ip-streamer
-mkdir -p build
+mkdir build
 cd build
 cmake ../
 make
 
-# Loop through the number of containers, configuring each one
-for (( i=0; i<container_count; i++ )); do
-  # Docker container name and port
-  container_name="rtl_fm_streamer_$i"
+# Add /usr/local/lib to the library path if it's not there already
+if ! grep -q "/usr/local/lib" /etc/ld.so.conf.d/rtlsdr.conf; then
+  echo "/usr/local/lib" | sudo tee /etc/ld.so.conf.d/rtlsdr.conf
+  sudo ldconfig
+fi
+
+# Blacklist the conflicting DVB module to avoid conflicts with the RTL2832U device
+echo "Blacklisting dvb_usb_rtl28xxu kernel module..."
+echo "blacklist dvb_usb_rtl28xxu" | sudo tee /etc/modprobe.d/blacklist-rtl-sdr.conf
+sudo rmmod dvb_usb_rtl28xxu
+
+# Create systemd services for each tuner
+for (( i=0; i<tuner_count; i++ )); do
   port=$((1000 + i))
+  echo "Creating systemd service for tuner $i on port $port..."
 
-  # Prompt the user to select the RTL device for each container
-  rtl_device=$(dialog --inputbox "Enter the RTL-SDR device path for container $i (e.g., /dev/bus/usb/001/002):" 10 50 3>&1 1>&2 2>&3 3>&-)
-  clear
+  sudo tee /etc/systemd/system/rtl_fm_streamer_$i.service > /dev/null <<EOL
+[Unit]
+Description=RTL SDR FM Streamer for Tuner $i
+After=network.target
 
-  # Create and run Docker containers
-  echo "Creating and starting container $container_name for tuner $i..."
-  docker run -d \
-    --name $container_name \
-    --network rtl_sdr_network \
-    --device $rtl_device \
-    -p $port:1000 \
-    -v $(pwd)/fm2ip-streamer/build:/usr/local/bin \
-    ubuntu:24.04 /usr/local/bin/rtl_fm_streamer -P 1000 -d $i
+[Service]
+ExecStart=/usr/local/bin/rtl_fm_streamer -P $port -d $i
+WorkingDirectory=/usr/local/bin
+Restart=always
+User=$(whoami)
+
+[Install]
+WantedBy=multi-user.target
+EOL
 
   # Enable and start the service
   sudo systemctl daemon-reload
@@ -81,10 +70,10 @@ for (( i=0; i<container_count; i++ )); do
 done
 
 # Display usage instructions
-echo "RTL SDR FM Streamer is now running for $container_count containers."
-for (( i=0; i<container_count; i++ )); do
+echo "RTL SDR FM Streamer is now running for $tuner_count tuners."
+for (( i=0; i<tuner_count; i++ )); do
   port=$((1000 + i))
-  echo "Container $i is streaming on port $port:"
+  echo "Tuner $i is streaming on port $port:"
   echo "  Mono: http://<your_ip>:$port/<FrequencyInHz>"
   echo "  Stereo: http://<your_ip>:$port/<FrequencyInHz>/1"
 done
