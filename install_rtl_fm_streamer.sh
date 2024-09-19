@@ -6,9 +6,9 @@
 echo "Updating system..."
 sudo apt-get update && sudo apt-get upgrade -y
 
-# Install required dependencies including dialog for interactive input
+# Install required dependencies
 echo "Installing dependencies..."
-sudo apt-get install -y git cmake build-essential libusb-1.0-0-dev libev-dev net-tools
+sudo apt-get install -y git cmake build-essential libusb-1.0-0-dev libev-dev net-tools dialog
 
 # Clone the fm2ip-streamer repository
 echo "Cloning fm2ip-streamer repository..."
@@ -22,11 +22,18 @@ cd build
 cmake ../
 make
 
+# Install the built binaries and libraries
+echo "Installing fm2ip-streamer..."
+sudo make install
+
 # Add /usr/local/lib to the library path if it's not there already
 if ! grep -q "/usr/local/lib" /etc/ld.so.conf.d/rtlsdr.conf; then
   echo "/usr/local/lib" | sudo tee /etc/ld.so.conf.d/rtlsdr.conf
   sudo ldconfig
 fi
+
+# Reload the library cache to ensure the system recognizes the librtlsdr library
+sudo ldconfig
 
 # Blacklist the conflicting DVB module to avoid conflicts with the RTL2832U device
 echo "Blacklisting dvb_usb_rtl28xxu kernel module..."
