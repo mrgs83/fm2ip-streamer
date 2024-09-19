@@ -41,7 +41,7 @@ Description=RTL SDR FM Streamer
 After=network.target
 
 [Service]
-ExecStart=$(pwd)/rtl_fm_streamer -P 2346
+ExecStart=$(pwd)/rtl_fm_streamer -P 1001
 WorkingDirectory=$(pwd)
 Restart=always
 User=$(whoami)
@@ -59,8 +59,8 @@ sudo systemctl start rtl_fm_streamer.service
 # Display usage instructions
 echo "RTL SDR FM Streamer is now running."
 echo "Usage:"
-echo "  Mono: http://<your_ip>:2346/<FrequencyInHz>"
-echo "  Stereo: http://<your_ip>:2346/<FrequencyInHz>/1"
+echo "  Mono: http://<your_ip>:1001/<FrequencyInHz>"
+echo "  Stereo: http://<your_ip>:1001/<FrequencyInHz>/1"
 echo "To change the port, edit the systemd service file (/etc/systemd/system/rtl_fm_streamer.service)."
 
 # Installation complete
