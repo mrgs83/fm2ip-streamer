@@ -10,13 +10,14 @@ sudo apt-get update && sudo apt-get upgrade -y
 echo "Installing dependencies..."
 sudo apt-get install -y git cmake build-essential libusb-1.0-0-dev libev-dev net-tools dialog
 
-# Use dialog to ask the user how many tuners to deploy
-tuner_count=$(dialog --inputbox "How many tuners are you planning to use?" 10 30 3>&1 1>&2 2>&3 3>&-)
+# Use dialog to ask the user for frequencies in MHz
+freq_list=$(dialog --inputbox "Enter the frequencies (in MHz) separated by commas (e.g., 99.7, 102.3, 105.5):" 10 50 3>&1 1>&2 2>&3 3>&-)
 clear
 
-# Validate tuner count input
-if ! [[ "$tuner_count" =~ ^[0-9]+$ ]]; then
-  echo "Invalid input. Please enter a number."
+# Convert frequencies from MHz to Hz
+IFS=',' read -ra freqs <<< "$freq_list"
+if [ ${#freqs[@]} -eq 0 ]; then
+  echo "Invalid input. Please enter valid frequencies."
   exit 1
 fi
 
@@ -27,7 +28,7 @@ git clone https://github.com/mrgs83/fm2ip-streamer.git
 # Build fm2ip-streamer
 echo "Building fm2ip-streamer..."
 cd fm2ip-streamer
-mkdir build
+mkdir -p build
 cd build
 cmake ../
 make
@@ -43,18 +44,19 @@ echo "Blacklisting dvb_usb_rtl28xxu kernel module..."
 echo "blacklist dvb_usb_rtl28xxu" | sudo tee /etc/modprobe.d/blacklist-rtl-sdr.conf
 sudo rmmod dvb_usb_rtl28xxu
 
-# Create systemd services for each tuner
-for (( i=0; i<tuner_count; i++ )); do
+# Create systemd services for each frequency
+for i in "${!freqs[@]}"; do
   port=$((1000 + i))
-  echo "Creating systemd service for tuner $i on port $port..."
+  freq_hz=$(echo "${freqs[$i]} * 1000000" | bc)
+  echo "Creating systemd service for frequency ${freqs[$i]} MHz on port $port..."
 
   sudo tee /etc/systemd/system/rtl_fm_streamer_$i.service > /dev/null <<EOL
 [Unit]
-Description=RTL SDR FM Streamer for Tuner $i
+Description=RTL SDR FM Streamer for Frequency ${freqs[$i]} MHz
 After=network.target
 
 [Service]
-ExecStart=/usr/local/bin/rtl_fm_streamer -P $port -d $i
+ExecStart=/usr/local/bin/rtl_fm_streamer -P $port -d $i -f $freq_hz
 WorkingDirectory=/usr/local/bin
 Restart=always
 User=$(whoami)
@@ -70,12 +72,12 @@ EOL
 done
 
 # Display usage instructions
-echo "RTL SDR FM Streamer is now running for $tuner_count tuners."
-for (( i=0; i<tuner_count; i++ )); do
+echo "RTL SDR FM Streamer is now running for the following frequencies:"
+for i in "${!freqs[@]}"; do
   port=$((1000 + i))
-  echo "Tuner $i is streaming on port $port:"
-  echo "  Mono: http://<your_ip>:$port/<FrequencyInHz>"
-  echo "  Stereo: http://<your_ip>:$port/<FrequencyInHz>/1"
+  echo "Frequency ${freqs[$i]} MHz is streaming on port $port:"
+  echo "  Mono: http://<your_ip>:$port/${freq_hz}"
+  echo "  Stereo: http://<your_ip>:$port/${freq_hz}/1"
 done
 
 # Installation complete
