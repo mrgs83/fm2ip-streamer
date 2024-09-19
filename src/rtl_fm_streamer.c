@@ -46,38 +46,6 @@
  *       watchdog to reset bad dongle
  *       fix oversampling
  */
-#define MAX_TUNERS 4  // Define a maximum number of tuners supported
-
-struct tuner_state {
-    int device_index;         // Index of the device (tuner)
-    uint32_t freq;            // Frequency to tune
-    int port;                 // Port to stream
-    pthread_t thread;         // Thread for this tuner
-    rtlsdr_dev_t *dev;        // RTL-SDR device handle
-    struct demod_state demod; // Demodulator state
-    struct output_state output; // Output state
-};
-
-struct tuner_state tuners[MAX_TUNERS];
-
-// Initialize each tuner with a device, port, and frequency
-void init_tuners(int num_tuners) {
-    for (int i = 0; i < num_tuners; i++) {
-        tuners[i].device_index = i;  // Device index is the tuner number
-        tuners[i].port = 1000 + i;   // Assign a unique port for each tuner (e.g., 1000, 1001)
-        tuners[i].freq = 98300000;   // Set an example frequency
-        pthread_create(&tuners[i].thread, NULL, tuner_thread_fn, (void*)&tuners[i]);
-    }
-}
-
-// Thread function for each tuner
-void* tuner_thread_fn(void* arg) {
-    struct tuner_state *tuner = (struct tuner_state*)arg;
-    // Configure and start streaming for this tuner
-    configure_tuner(tuner->device_index, tuner->port, tuner->freq);
-    return NULL;
-}
-
 #include <errno.h>
 #include <signal.h>
 #include <string.h>
